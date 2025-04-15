@@ -1,23 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useReadContract } from "wagmi";
+import { useAccount, useReadContract } from "wagmi"; 
 import { readContracts } from "wagmi/actions";
 import { config as wagmiConfig } from "../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
 import Link from "next/link";
-import modelRegistryAbiRaw from "../../blockchain/abi/FusionAI_ModelRegistry.json";
-import marketplaceAbiRaw from "../../blockchain/abi/FusionAI_Marketplace.json";
-import { Abi } from 'viem';
-import { fetchIPFSMetadata } from '../../lib/ipfs';
+import modelRegistryAbiJson from "../../blockchain/artifacts/contracts/FusionAI_ModelRegistry.sol/FusionAI_ModelRegistry.json"; 
+import marketplaceAbiJson from "../../blockchain/abi/FusionAI_Marketplace.json"; 
+import { Abi } from 'viem'; 
+import { fetchIPFSMetadata } from '../../lib/ipfs'; 
+import { modelRegistryAddress, marketplaceAddress } from '../config/contracts'; 
 
-// Type assertions for ABIs
-const modelRegistryAbi = modelRegistryAbiRaw as Abi;
-const marketplaceAbi = marketplaceAbiRaw as Abi;
-
-// Contract addresses
-const modelRegistryAddress = "0x3EAad6984869aCd0000eE0004366D31eD7Cea251" as `0x${string}`;
-const marketplaceAddress = "0x9638486bcb5d5Af5bC3b513149384e86B35A8678" as `0x${string}`;
+// Type the ABIs explicitly
+const modelRegistryAbi = modelRegistryAbiJson.abi as Abi;
+const marketplaceAbi = marketplaceAbiJson as Abi;
 
 // Define a type for the model data
 interface ModelData {
@@ -46,7 +43,7 @@ export default function MarketplacePage() {
   const [registeredModels, setRegisteredModels] = useState<ModelData[]>([]);
   const [isLoadingModels, setIsLoadingModels] = useState(false);
 
-  // Read model count
+  // Read model count using the hook
   const {
     data: modelCountBigInt,
     error: readError,
@@ -56,102 +53,108 @@ export default function MarketplacePage() {
     abi: modelRegistryAbi,
     functionName: "modelCount",
     chainId: sepolia.id,
+    query: { enabled: isConnected } // Fetch only when connected
   });
 
   const modelCount = modelCountBigInt !== undefined && modelCountBigInt !== null ? Number(modelCountBigInt) : 0;
 
-  // Effect to fetch all models when modelCount changes or on initial load
+  // Effect to fetch all models
   useEffect(() => {
     const fetchModels = async () => {
       if (modelCount > 0) {
         setIsLoadingModels(true);
         console.log(`Attempting to fetch ${modelCount} models...`);
         try {
-          // Create an array of promises for fetching models
-          const modelFetchPromises = [];
+          // Create an array of contracts to call
+          const contractsToCall = [];
           for (let i = 0; i < modelCount; i++) {
-            modelFetchPromises.push(
-              (async () => {
-                try {
-                  console.log(`Fetching base data for model ${i}...`);
-                  // Fetch model details from registry
-                  const modelResult = await readContracts(wagmiConfig, {
-                    contracts: [
-                      {
-                        address: modelRegistryAddress,
-                        abi: modelRegistryAbi,
-                        functionName: 'modelInfos',
-                        args: [i],
-                        chainId: sepolia.id,
-                      }
-                    ],
-                  });
+            contractsToCall.push({
+              address: modelRegistryAddress,
+              abi: modelRegistryAbi,
+              functionName: 'models', // Changed from modelInfos
+              args: [BigInt(i + 1)],
+              chainId: sepolia.id,
+            });
+          }
 
-                  if (modelResult[0].status === 'success' && Array.isArray(modelResult[0].result)) {
-                    const modelBaseData = modelResult[0].result;
-                    const ipfsHash = modelBaseData[1] as string;
+          // Call the contracts
+          const modelRegistryResults = await readContracts(wagmiConfig, {
+            contracts: contractsToCall,
+          });
 
-                    console.log(`Fetching marketplace data for model ${i}...`);
-                    // Fetch additional marketplace data
-                    const marketplaceData = await readContracts(wagmiConfig, {
-                      contracts: [
-                        {
-                          address: marketplaceAddress,
-                          abi: marketplaceAbi,
-                          functionName: 'isModelListed',
-                          args: [i],
-                          chainId: sepolia.id,
-                        },
-                        {
-                          address: marketplaceAddress,
-                          abi: marketplaceAbi,
-                          functionName: 'getModelPrice',
-                          args: [i],
-                          chainId: sepolia.id,
-                        }
-                      ],
-                    });
+          // Define the type for the result tuple from the 'models' function
+          type ModelResultTuple = readonly [string, string, string, string, bigint];
+          const modelDataArray = modelRegistryResults.map((result) => {
+            if (result.status === 'success' && result.result) {
+              return result.result as ModelResultTuple;
+            } else {
+              return null;
+            }
+          });
 
-                    const isListed = marketplaceData[0].status === 'success' ? marketplaceData[0].result as boolean : false;
-                    const price = marketplaceData[1].status === 'success' ? marketplaceData[1].result as bigint : null;
-
-                    console.log(`Fetching IPFS metadata for model ${i} with hash: ${ipfsHash}...`);
-                    // Fetch IPFS metadata
-                    let metadata = { name: 'N/A', description: 'Could not load description.' };
-                    try {
-                       metadata = await fetchIPFSMetadata(ipfsHash);
-                       console.log(`Successfully fetched metadata for model ${i}:`, metadata);
-                    } catch (ipfsError) {
-                       console.error(`Error fetching IPFS metadata for model ${i} (${ipfsHash}):`, ipfsError);
-                    }
-
-                    // Combine all data
-                    const fullModelData: ModelData = {
-                      id: i,
-                      owner: modelBaseData[0] as string,
-                      ipfsMetadataHash: ipfsHash,
-                      listTimestamp: modelBaseData[2] as bigint,
-                      saleType: Number(modelBaseData[3]),
-                      isListed,
-                      price,
-                      name: metadata.name,
-                      description: metadata.description
-                    };
-                    return fullModelData;
-                  }
-                } catch (error) {
-                  console.error(`Error processing model ${i}:`, error);
-                }
-                return null; // Return null if fetching failed for this model
-              })()
+          // Fetch listing details (isListed, price) from Marketplace contract
+          const listingContractsToCall = [];
+          for (let i = 0; i < modelCount; i++) {
+            listingContractsToCall.push(
+              {
+                address: marketplaceAddress,
+                abi: marketplaceAbi,
+                functionName: 'isModelListed',
+                args: [i],
+                chainId: sepolia.id,
+              },
+              {
+                address: marketplaceAddress,
+                abi: marketplaceAbi,
+                functionName: 'getModelPrice',
+                args: [i],
+                chainId: sepolia.id,
+              }
             );
           }
 
-          // Wait for all promises to resolve
-          const results = await Promise.all(modelFetchPromises);
+          const listingDetailsResults = await readContracts(wagmiConfig, {
+            contracts: listingContractsToCall,
+          });
+
+          // Combine registry data and listing data, then fetch IPFS metadata
+          const combinedModelsPromises = modelDataArray.map(async (modelData, index) => {
+            if (modelData) {
+              const listingResult = listingDetailsResults[index * 2]; // isModelListed result
+              const priceResult = listingDetailsResults[index * 2 + 1]; // getModelPrice result
+
+              const isListed = listingResult.status === 'success' ? (listingResult.result as boolean) : false;
+              const price = priceResult.status === 'success' && isListed ? (priceResult.result as bigint) : null;
+
+              const ipfsHash = modelData[3];
+              let metadata = { name: 'N/A', description: 'Could not load metadata.' };
+              try {
+                metadata = await fetchIPFSMetadata(ipfsHash); // Fetch IPFS data here
+              } catch (ipfsError) {
+                console.error(`Error fetching IPFS metadata for model ${index + 1} (${ipfsHash}):`, ipfsError);
+              }
+
+              return {
+                id: index + 1, // Model IDs start from 1
+                owner: modelData[0],
+                name: metadata.name, // Use name from IPFS
+                description: metadata.description, // Use description from IPFS
+                ipfsMetadataHash: ipfsHash,
+                listTimestamp: modelData[4],
+                isListed: isListed,
+                price: price,
+                saleType: 0 // Assuming SaleType needs to be fetched or determined differently now
+              };
+            } else {
+              return null;
+            }
+          });
+
+          // Wait for all promises (including IPFS fetches) to resolve
+          const combinedModels = await Promise.all(combinedModelsPromises);
 
           // Filter out null results (failed fetches)
-          const successfulModels = results.filter(model => model !== null) as ModelData[];
+          const successfulModels = combinedModels.filter(model => model !== null) as ModelData[];
 
           setRegisteredModels(successfulModels);
           console.log("Finished fetching all models:", successfulModels);
@@ -167,7 +170,7 @@ export default function MarketplacePage() {
     };
 
     fetchModels();
-  }, [modelCount]);
+  }, [modelCount, isConnected]);
 
   // Helper function to format price
   const formatPrice = (price: bigint | null): string => {

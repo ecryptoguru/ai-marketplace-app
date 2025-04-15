@@ -6,18 +6,15 @@ import { readContract } from "wagmi/actions";
 import { config as wagmiConfig } from "../../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
 import Link from "next/link";
-import modelRegistryAbiJson from "../../../blockchain/abi/FusionAI_ModelRegistry.json";
+import modelRegistryAbiJson from "../../../blockchain/artifacts/contracts/FusionAI_ModelRegistry.sol/FusionAI_ModelRegistry.json";
 import marketplaceAbiJson from "../../../blockchain/abi/FusionAI_Marketplace.json";
 import { Abi, formatEther } from 'viem';
 import { fetchIPFSMetadata } from '../../../lib/ipfs';
+import { modelRegistryAddress, marketplaceAddress } from '../../config/contracts';
 
 // Type the ABIs explicitly
-const modelRegistryAbi = modelRegistryAbiJson as Abi;
+const modelRegistryAbi = modelRegistryAbiJson.abi as Abi;
 const marketplaceAbi = marketplaceAbiJson as Abi;
-
-// Contract addresses
-const modelRegistryAddress = "0x3EAad6984869aCd0000eE0004366D31eD7Cea251" as `0x${string}`;
-const marketplaceAddress = "0x9638486bcb5d5Af5bC3b513149384e86B35A8678" as `0x${string}`;
 
 interface OwnedModel {
   id: number;
@@ -65,7 +62,7 @@ export default function DeveloperDashboardPage() {
               const modelData = await readContract(wagmiConfig, {
                 address: modelRegistryAddress,
                 abi: modelRegistryAbi,
-                functionName: 'modelInfos',
+                functionName: 'models', // Changed from modelInfos
                 args: [modelId],
                 chainId: sepolia.id,
               });

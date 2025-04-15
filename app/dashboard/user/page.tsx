@@ -6,18 +6,14 @@ import { readContracts } from "wagmi/actions";
 import { config as wagmiConfig } from "../../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
 import Link from "next/link";
-import modelRegistryAbiJson from "../../../blockchain/abi/FusionAI_ModelRegistry.json";
+import modelRegistryAbiJson from "../../../blockchain/artifacts/contracts/FusionAI_ModelRegistry.sol/FusionAI_ModelRegistry.json";
 import marketplaceAbiJson from "../../../blockchain/abi/FusionAI_Marketplace.json";
 import { Abi } from 'viem';
-import { fetchIPFSMetadata } from '../../../lib/ipfs';
+import { modelRegistryAddress, marketplaceAddress } from '../../config/contracts';
 
 // Type the ABIs explicitly
-const modelRegistryAbi = modelRegistryAbiJson as Abi;
+const modelRegistryAbi = modelRegistryAbiJson.abi as Abi;
 const marketplaceAbi = marketplaceAbiJson as Abi;
-
-// Contract addresses
-const modelRegistryAddress = "0x3EAad6984869aCd0000eE0004366D31eD7Cea251" as `0x${string}`;
-const marketplaceAddress = "0x9638486bcb5d5Af5bC3b513149384e86B35A8678" as `0x${string}`;
 
 interface PurchasedModel {
   id: number;
@@ -26,97 +22,113 @@ interface PurchasedModel {
   owner: string; 
 }
 
+// Define the expected structure of the 'models' function result
+type ModelInfoResult = readonly [string, string, string, string, bigint];
+// Define the structure for contract calls used with readContracts
+type ContractReadCall = {
+  address: `0x${string}`;
+  abi: Abi;
+  functionName: string;
+  args?: unknown[];
+  chainId?: number;
+};
+
 export default function UserDashboardPage() {
   const { address, isConnected } = useAccount();
   const [purchasedModels, setPurchasedModels] = useState<PurchasedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Read model count
-  const { data: modelCountBigInt } = useReadContract({
+  // Read total model count using the hook
+  const { data: modelCountData } = useReadContract({
     address: modelRegistryAddress,
     abi: modelRegistryAbi,
     functionName: "modelCount",
     chainId: sepolia.id,
+    // Query only when connected
+    query: { enabled: isConnected },
   });
-
-  const modelCount = modelCountBigInt !== undefined && modelCountBigInt !== null ? Number(modelCountBigInt) : 0;
+  const totalModelCount = modelCountData ? Number(modelCountData) : 0;
 
   useEffect(() => {
     const fetchPurchasedModels = async () => {
-      if (!isConnected || !address || modelCount === 0) {
+      if (!isConnected || !address || totalModelCount === 0) {
         setPurchasedModels([]);
+        setIsLoading(false);
         return;
       }
 
       setIsLoading(true);
-      setError(null);
-      console.log(`Fetching purchased models for user: ${address}, total models: ${modelCount}`);
+      const modelDetailsContracts: ContractReadCall[] = [];
 
       try {
-        const modelChecks = [];
-        for (let i = 0; i < modelCount; i++) {
-          modelChecks.push(
-            (async () => {
-              try {
-                // Fetch model owner and check access in parallel
-                const results = await readContracts(wagmiConfig, {
-                  contracts: [
-                    {
-                      address: modelRegistryAddress,
-                      abi: modelRegistryAbi,
-                      functionName: 'modelInfos',
-                      args: [i],
-                      chainId: sepolia.id,
-                    },
-                    {
-                      address: marketplaceAddress,
-                      abi: marketplaceAbi,
-                      functionName: 'hasAccess',
-                      args: [address, i],
-                      chainId: sepolia.id,
-                    }
-                  ]
-                });
+        // First, get all model IDs the user has access to
+        const accessCheckContracts = Array.from({ length: totalModelCount }, (_, i) => ({
+          address: marketplaceAddress,
+          abi: marketplaceAbi,
+          functionName: 'hasAccess',
+          args: [BigInt(i + 1), address],
+          chainId: sepolia.id,
+        }));
 
-                const modelResult = results[0];
-                const accessResult = results[1];
+        const accessResults = await readContracts(wagmiConfig, {
+          contracts: accessCheckContracts,
+        });
 
-                if (modelResult.status === 'success' && accessResult.status === 'success') {
-                  const modelData = modelResult.result as [string, string, bigint, number]; 
-                  const hasAccess = accessResult.result as boolean;
-                  const owner = modelData[0]; 
-                  const ipfsHash = modelData[1]; 
-                  
-                  // Check if user has access AND is NOT the owner
-                  if (hasAccess && owner.toLowerCase() !== address.toLowerCase()) {
-                     console.log(`User has purchased access to model ${i}`);
-                     // Fetch metadata for name
-                     let metadata = { name: `Model ${i}` };
-                     try {
-                       metadata = await fetchIPFSMetadata(ipfsHash);
-                     } catch (ipfsError) {
-                       console.error(`Failed to fetch metadata for purchased model ${i}:`, ipfsError);
-                     }
-                     return { id: i, name: metadata.name, ipfsMetadataHash: ipfsHash, owner: owner };
-                  }
-                }
-              } catch (err) {
-                console.error(`Error checking model ${i}:`, err);
-              }
-              return null;
-            })()
-          );
+        // Filter model IDs where user has access
+        const accessibleModelIds = accessResults
+          .map((result, index) => (result.status === 'success' && result.result ? index + 1 : null))
+          .filter((id): id is number => id !== null);
+
+        // Now, fetch details ONLY for accessible models
+        for (const modelId of accessibleModelIds) {
+          modelDetailsContracts.push({
+            address: modelRegistryAddress,
+            abi: modelRegistryAbi,
+            functionName: 'models',
+            args: [BigInt(modelId)],
+            chainId: sepolia.id,
+          });
         }
 
-        const results = await Promise.all(modelChecks);
-        const filteredModels = results.filter(model => model !== null) as PurchasedModel[];
-        setPurchasedModels(filteredModels);
-        console.log("Purchased models found:", filteredModels);
+        if (modelDetailsContracts.length === 0) {
+          setPurchasedModels([]);
+          setIsLoading(false);
+          return; // No accessible models to fetch details for
+        }
 
-      } catch (err) { 
-        console.error("Error fetching purchased models:", err);
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+        const modelDetailsResults = await readContracts(wagmiConfig, {
+          contracts: modelDetailsContracts,
+        });
+
+        // Filter out nulls (errors or models the user owns)
+        const validPurchasedModels = modelDetailsResults
+          .map((result, index) => {
+            // Check if the result is successful and the owner is not the current user
+            if (result.status === 'success' && result.result) {
+              const modelData = result.result as ModelInfoResult;
+              const owner = modelData[0];
+              const name = modelData[1];
+              const cid = modelData[3]; // Assuming cid is at index 3
+
+              if (owner.toLowerCase() !== address?.toLowerCase()) {
+                const modelId = accessibleModelIds[index];
+                return {
+                  id: modelId,
+                  name: name,
+                  ipfsMetadataHash: cid,
+                  owner: owner,
+                };
+              }
+            }
+            return null;
+          })
+          .filter((model): model is PurchasedModel => model !== null);
+
+        setPurchasedModels(validPurchasedModels);
+      } catch (error) {
+        console.error("Error fetching purchased models:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
         setError(`Failed to load purchased models: ${errorMessage}`);
         setPurchasedModels([]);
       } finally {
@@ -125,7 +137,7 @@ export default function UserDashboardPage() {
     };
 
     fetchPurchasedModels();
-  }, [address, isConnected, modelCount]);
+  }, [address, isConnected, totalModelCount]);
 
   return (
     <main className="container mx-auto px-4 py-8">
@@ -166,9 +178,9 @@ export default function UserDashboardPage() {
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 break-all">
                   Metadata Hash: {model.ipfsMetadataHash}
                 </p>
-                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 text-right">
-                   <span className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">View Details &rarr;</span>
-                 </div>
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 text-right">
+                  <span className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">View Details &rarr;</span>
+                </div>
               </div>
             </Link>
           ))}

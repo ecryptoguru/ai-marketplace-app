@@ -1,24 +1,21 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams } from 'next/navigation';
+import Link from "next/link";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { readContracts } from "wagmi/actions";
 import { config as wagmiConfig } from "../../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
-import { formatEther, Abi } from "viem";
-import Link from "next/link";
-import modelRegistryAbiJson from "../../../blockchain/abi/FusionAI_ModelRegistry.json";
-import marketplaceAbiJson from "../../../blockchain/abi/FusionAI_Marketplace.json";
-import { fetchIPFSMetadata, getIPFSGatewayUrl } from "../../../lib/ipfs";
+import modelRegistryAbiJson from "../../../blockchain/artifacts/contracts/FusionAI_ModelRegistry.sol/FusionAI_ModelRegistry.json"; 
+import marketplaceAbiJson from "../../../blockchain/abi/FusionAI_Marketplace.json"; 
+import { Abi, formatEther } from 'viem';
+import { fetchIPFSMetadata, getIPFSGatewayUrl } from '../../../lib/ipfs';
+import { modelRegistryAddress, marketplaceAddress } from '../../config/contracts'; 
 
 // Type the ABIs explicitly
-const modelRegistryAbi = modelRegistryAbiJson as Abi;
-const marketplaceAbi = marketplaceAbiJson as Abi;
-
-// Contract addresses
-const modelRegistryAddress = "0x3EAad6984869aCd0000eE0004366D31eD7Cea251" as `0x${string}`;
-const marketplaceAddress = "0x9638486bcb5d5Af5bC3b513149384e86B35A8678" as `0x${string}`;
+const modelRegistryAbi = modelRegistryAbiJson.abi as Abi; 
+const marketplaceAbi = marketplaceAbiJson as Abi; 
 
 // Sale types from the contract
 enum SaleType {
@@ -27,18 +24,20 @@ enum SaleType {
   Subscription = 2
 }
 
-// Type definitions for IPFS metadata
+// IPFS Metadata Structure
+interface FileInfo {
+  name: string;
+  size: number;
+  type: string;
+  cid?: string;
+}
+
 interface IpfsMetadata {
   name: string;
   description: string;
   created: string;
   creator: string;
-  files: Array<{
-    name: string;
-    size: number;
-    type: string;
-    cid?: string;
-  }>;
+  files: Array<FileInfo>;
 }
 
 // Type definition for model data
@@ -178,7 +177,7 @@ export default function ModelDetailPage() {
               address: modelRegistryAddress,
               abi: modelRegistryAbi,
               functionName: 'models',
-              args: [modelId],
+              args: [BigInt(modelId)],
               chainId: sepolia.id,
             }
           ],
@@ -199,14 +198,14 @@ export default function ModelDetailPage() {
               address: marketplaceAddress,
               abi: marketplaceAbi,
               functionName: 'isModelListed',
-              args: [modelId],
+              args: [BigInt(modelId)],
               chainId: sepolia.id,
             },
             {
               address: marketplaceAddress,
               abi: marketplaceAbi,
               functionName: 'getModelPrice',
-              args: [modelId],
+              args: [BigInt(modelId)],
               chainId: sepolia.id,
             }
           ],
@@ -223,14 +222,22 @@ export default function ModelDetailPage() {
                 address: marketplaceAddress,
                 abi: marketplaceAbi,
                 functionName: 'hasAccess',
-                args: [address, modelId],
+                args: [BigInt(modelId), address],
                 chainId: sepolia.id,
-              }
+              },
+              {
+                address: modelRegistryAddress,
+                abi: modelRegistryAbi,
+                functionName: 'ownerOf',
+                args: [BigInt(modelId)],
+                chainId: sepolia.id,
+              },
             ],
           });
           
           const hasModelAccess = accessResult[0].status === 'success' ? accessResult[0].result as boolean : false;
-          setHasAccess(hasModelAccess);
+          const isOwner = accessResult[1].status === 'success' ? accessResult[1].result === address : false;
+          setHasAccess(hasModelAccess || isOwner);
         }
         
         // Combine all data
@@ -306,7 +313,7 @@ export default function ModelDetailPage() {
 
   // Purchase model
   const purchaseModel = async () => {
-    if (!model || !isConnected || !model.price) return; // Add null check for price
+    if (!model || !isConnected || !model.price) return; 
     
     try {
       writePurchaseContract({
@@ -314,7 +321,7 @@ export default function ModelDetailPage() {
         abi: marketplaceAbi,
         functionName: "purchaseModel",
         args: [BigInt(modelId)],
-        value: model.price, // This is already a bigint
+        value: model.price, 
         chainId: sepolia.id,
       });
     } catch (error: unknown) {
@@ -435,7 +442,7 @@ export default function ModelDetailPage() {
                 <div>
                   <h2 className="text-xl font-semibold mb-3">Files</h2>
                   <ul className="space-y-2 bg-gray-50 dark:bg-zinc-800 p-4 rounded-md">
-                    {metadata.files.map((file: { name: string; size: number; type: string; cid?: string }, index: number) => (
+                    {metadata.files.map((file: FileInfo, index: number) => (
                       <li key={index} className="flex justify-between items-center">
                         <div className="flex items-center">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -561,7 +568,7 @@ export default function ModelDetailPage() {
                     >
                       {isPurchasePending || transactionStatus.status === "processing" ? (
                         <span className="flex items-center justify-center">
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                           </svg>
