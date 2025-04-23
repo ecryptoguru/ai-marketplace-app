@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAccount, useReadContract } from "wagmi";
-import { readContracts } from "wagmi/actions";
+import { readContracts } from '@wagmi/core';
 import { config as wagmiConfig } from "../../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
 import Link from "next/link";
@@ -22,8 +22,12 @@ interface PurchasedModel {
   owner: string; 
 }
 
-// Define the expected structure of the 'models' function result
-type ModelInfoResult = readonly [string, string, string, string, bigint];
+interface SubscriptionModel {
+  id: number;
+  name: string;
+  ipfsMetadataHash: string;
+}
+
 // Define the structure for contract calls used with readContracts
 type ContractReadCall = {
   address: `0x${string}`;
@@ -33,11 +37,23 @@ type ContractReadCall = {
   chainId?: number;
 };
 
+function isSuccessResult<T>(res: unknown): res is { status: 'success'; result: T } {
+  return (
+    typeof res === 'object' &&
+    res !== null &&
+    'status' in res &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (res as any).status === 'success' &&
+    'result' in res
+  );
+}
+
 export default function UserDashboardPage() {
   const { address, isConnected } = useAccount();
   const [purchasedModels, setPurchasedModels] = useState<PurchasedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<SubscriptionModel[]>([]);
 
   // Read total model count using the hook
   const { data: modelCountData } = useReadContract({
@@ -71,13 +87,11 @@ export default function UserDashboardPage() {
           chainId: sepolia.id,
         }));
 
-        const accessResults = await readContracts(wagmiConfig, {
-          contracts: accessCheckContracts,
-        });
+        const accessResults = await readContracts(wagmiConfig, { contracts: accessCheckContracts });
 
         // Filter model IDs where user has access
         const accessibleModelIds = accessResults
-          .map((result, index) => (result.status === 'success' && result.result ? index + 1 : null))
+          .map((res, i) => (isSuccessResult<boolean>(res) && res.result ? i + 1 : null))
           .filter((id): id is number => id !== null);
 
         // Now, fetch details ONLY for accessible models
@@ -97,31 +111,20 @@ export default function UserDashboardPage() {
           return; // No accessible models to fetch details for
         }
 
-        const modelDetailsResults = await readContracts(wagmiConfig, {
-          contracts: modelDetailsContracts,
-        });
+        const modelDetailsResults = await readContracts(wagmiConfig, { contracts: modelDetailsContracts });
 
         // Filter out nulls (errors or models the user owns)
         const validPurchasedModels = modelDetailsResults
-          .map((result, index) => {
-            // Check if the result is successful and the owner is not the current user
-            if (result.status === 'success' && result.result) {
-              const modelData = result.result as ModelInfoResult;
-              const owner = modelData[0];
-              const name = modelData[1];
-              const cid = modelData[3]; // Assuming cid is at index 3
-
-              if (owner.toLowerCase() !== address?.toLowerCase()) {
-                const modelId = accessibleModelIds[index];
-                return {
-                  id: modelId,
-                  name: name,
-                  ipfsMetadataHash: cid,
-                  owner: owner,
-                };
-              }
-            }
-            return null;
+          .map((res, idx) => {
+            if (!isSuccessResult<[string, string, string, string]>(res) || !Array.isArray(res.result)) return null;
+            const [, name, , ipfsMetadataHash] = res.result;
+            const modelId = accessibleModelIds[idx];
+            return {
+              id: modelId,
+              name: name,
+              ipfsMetadataHash: ipfsMetadataHash,
+              owner: '',
+            };
           })
           .filter((model): model is PurchasedModel => model !== null);
 
@@ -139,9 +142,64 @@ export default function UserDashboardPage() {
     fetchPurchasedModels();
   }, [address, isConnected, totalModelCount]);
 
+  useEffect(() => {
+    async function fetchSubscriptions() {
+      if (!isConnected || !address) return;
+      try {
+        // Fetch all models, check for active subscriptions
+        const subscriptionModels: SubscriptionModel[] = [];
+        for (let i = 0; i < totalModelCount; i++) {
+          const modelResult = await readContracts(wagmiConfig, { contracts: [{
+            address: modelRegistryAddress,
+            abi: modelRegistryAbi,
+            functionName: "models",
+            args: [i],
+            chainId: sepolia.id,
+          }] });
+          if (!Array.isArray(modelResult) || !isSuccessResult<[string, string, string, string, bigint]>(modelResult[0]) || !Array.isArray(modelResult[0].result)) continue;
+          const [, name, ipfsMetadataHash, , saleType] = modelResult[0].result;
+          if (Number(saleType) === 2) {
+            // Check subscription status
+            const subscriptionResult = await readContracts(wagmiConfig, { contracts: [{
+              address: marketplaceAddress,
+              abi: marketplaceAbi,
+              functionName: "checkSubscription",
+              args: [i, address],
+              chainId: sepolia.id,
+            }] });
+            if (Array.isArray(subscriptionResult) && isSuccessResult<boolean>(subscriptionResult[0]) && Boolean(subscriptionResult[0].result)) {
+              subscriptionModels.push({ id: i, name, ipfsMetadataHash });
+            }
+          }
+        }
+        setActiveSubscriptions(subscriptionModels);
+      } catch {
+        // fail silently for now
+      }
+    }
+    fetchSubscriptions();
+  }, [isConnected, address, totalModelCount]);
+
   return (
     <main className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">My Purchased Models</h1>
+
+      {activeSubscriptions.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Active Subscriptions</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {activeSubscriptions.map((sub) => (
+              <div key={sub.id} className="bg-white dark:bg-zinc-900 shadow-md rounded-lg p-6 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold mb-2 truncate" title={sub.name}>{sub.name}</h3>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 break-all mb-2">Metadata Hash: {sub.ipfsMetadataHash}</p>
+                  <Link href={`/model/${sub.id}`} className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm">View Model</Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isConnected ? (
         <div className="bg-yellow-100 dark:bg-yellow-900/20 p-6 rounded-lg text-center">

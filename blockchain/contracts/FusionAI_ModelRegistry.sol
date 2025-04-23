@@ -24,6 +24,13 @@ contract FusionAI_ModelRegistry {
     // --- State Variables ---
 
     mapping(uint256 => Model) public models;            // modelId => Model details
+
+    /**
+     * @dev Returns the Model struct for a given modelId.
+     */
+    function getModel(uint256 modelId) external view returns (Model memory) {
+        return models[modelId];
+    }
     mapping(string => bool) public ipfsHashExists;      // ipfsMetadataHash => exists
     uint256 private _modelCounter;                     // Counter for total models registered
 

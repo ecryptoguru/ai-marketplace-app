@@ -1,36 +1,56 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FusionAI Marketplace
 
-## Getting Started
+A decentralized platform for registering, listing, and purchasing AI models, built with Next.js, Wagmi, and smart contracts on Ethereum (Sepolia). IPFS is used for decentralized model storage (mocked for now). The platform supports both developers (model creators) and users (model consumers) with a modern, user-centric UI and robust contract integration.
 
-First, run the development server:
+## Features
+- Register AI models on-chain with metadata (name, description, IPFS hash)
+- List models for sale (Copies or Subscription) with price setting
+- Purchase models and gain access (ETH payments, on-chain access control)
+- Multi-step upload and listing wizard (drag-and-drop, sale type, price)
+- User Dashboard: View purchased models
+- Developer Dashboard: View and manage owned models, see listing status and revenue
+- Wallet connection (Wagmi, Web3Modal)
+- Responsive UI with Tailwind CSS and Shadcn UI
+- Mock IPFS upload (real IPFS integration planned)
+- **Upgradeable contracts (UUPS proxies) with operator pattern for secure marketplace/registry interaction**
+- **Automated ABI copying and contract config sync—frontend/backend always use latest contract addresses/ABIs after deployment**
+- **Strict linting and type-checking enforced for all code and scripts**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Quick Start
+1. Clone the repo and install dependencies:
+   ```sh
+   pnpm install
+   ```
+2. Copy `.env.example` to `.env.local` and set your environment variables (see contract addresses below).
+3. Start the app:
+   ```sh
+   pnpm dev
+   ```
+4. Deploy contracts (from `blockchain/`):
+   ```sh
+   pnpm hardhat run scripts/deploy.ts --network sepolia
+   ```
+   This will output contract addresses and ABIs to the frontend/backend for seamless integration.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Contract Addresses (Sepolia)
+- **FusionAI_ModelRegistry:** `0x3EAad6984869aCd0000eE0004366D31eD7Cea251`
+- **FusionAI_Marketplace:** `0x9638486bcb5d5Af5bC3b513149384e86B35A8678`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development Patterns
+- Next.js App Router (app/ directory), server components by default
+- Wagmi for wallet/blockchain interaction
+- React Query for wallet-dependent fetches
+- Zod + React Hook Form for all forms
+- Multi-step wizard for model upload/listing
+- Operator pattern: Marketplace is set as operator in ModelRegistry
+- **All code/scripts must pass strict lint/type checks before deploy**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Roadmap / Next Steps
+- Real IPFS integration
+- Advanced search/filter for models
+- Subscription management features
+- Developer analytics
+- Multi-network contract config
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contributing
+PRs and issues welcome! Please ensure all code passes lint/type checks and follows the documented architecture and patterns.

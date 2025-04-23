@@ -4,14 +4,18 @@ import { useState, useEffect } from "react";
 import { useParams } from 'next/navigation';
 import Link from "next/link";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
-import { readContracts } from "wagmi/actions";
+import { readContracts } from '@wagmi/core';
 import { config as wagmiConfig } from "../../../lib/web3modal";
 import { sepolia } from "wagmi/chains";
 import modelRegistryAbiJson from "../../../blockchain/artifacts/contracts/FusionAI_ModelRegistry.sol/FusionAI_ModelRegistry.json"; 
 import marketplaceAbiJson from "../../../blockchain/abi/FusionAI_Marketplace.json"; 
-import { Abi, formatEther } from 'viem';
+import { Abi, formatEther, parseEther } from 'viem';
 import { fetchIPFSMetadata, getIPFSGatewayUrl } from '../../../lib/ipfs';
 import { modelRegistryAddress, marketplaceAddress } from '../../config/contracts'; 
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import type { SubmitHandler } from "react-hook-form";
 
 // Type the ABIs explicitly
 const modelRegistryAbi = modelRegistryAbiJson.abi as Abi; 
@@ -70,6 +74,11 @@ async function fetchModelMetadata(cid: string): Promise<IpfsMetadata> {
     
     return validatedMetadata;
   } catch (error) {
+    if (error instanceof Error) {
+      console.error("Error fetching IPFS metadata:", error.message);
+    } else {
+      console.error("Error fetching IPFS metadata:", String(error));
+    }
     console.error("Error fetching IPFS metadata:", error);
     
     // Return fallback data if fetch fails
@@ -83,6 +92,17 @@ async function fetchModelMetadata(cid: string): Promise<IpfsMetadata> {
       ]
     };
   }
+}
+
+// Type guard for contract results
+function isSuccessResult<T>(res: unknown): res is { status: 'success'; result: T } {
+  return (
+    typeof res === 'object' &&
+    res !== null &&
+    'status' in res &&
+    (res as any).status === 'success' // eslint-disable-line @typescript-eslint/no-explicit-any
+    && 'result' in (res as any) // eslint-disable-line @typescript-eslint/no-explicit-any
+  );
 }
 
 export default function ModelDetailPage() {
@@ -129,6 +149,26 @@ export default function ModelDetailPage() {
     hash: ""
   });
 
+  // Subscription state
+  const [subscriptionStatus, setSubscriptionStatus] = useState<'active' | 'expired' | 'none' | 'checking'>('checking');
+  const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const [subscribeError, setSubscribeError] = useState<string | null>(null);
+
+  const subscribeSchema = z.object({
+    months: z.string().refine((val) => !isNaN(Number(val)) && Number(val) > 0, {
+      message: "Enter a valid number of months",
+    }),
+  });
+  const defaultSubscribeValues = { months: "1" };
+  const {
+    register: registerSubscribe,
+    handleSubmit: handleSubscribeSubmit,
+    formState: { errors: subscribeErrors },
+  } = useForm({
+    resolver: zodResolver(subscribeSchema),
+    defaultValues: defaultSubscribeValues,
+  });
+
   // Handle transaction status updates
   useEffect(() => {
     if (isPurchasePending) {
@@ -171,82 +211,87 @@ export default function ModelDetailPage() {
         setIsLoading(true);
         
         // Fetch model details from registry
-        const modelResult = await readContracts(wagmiConfig, {
-          contracts: [
-            {
-              address: modelRegistryAddress,
-              abi: modelRegistryAbi,
-              functionName: 'models',
-              args: [BigInt(modelId)],
-              chainId: sepolia.id,
-            }
-          ],
-        });
+        const modelResult = await readContracts(wagmiConfig, { contracts: [{
+          address: modelRegistryAddress,
+          abi: modelRegistryAbi,
+          functionName: 'models',
+          args: [BigInt(modelId)],
+          chainId: sepolia.id
+        }] });
         
-        if (modelResult[0].status !== 'success' || !Array.isArray(modelResult[0].result)) {
+        if (!Array.isArray(modelResult) || !isSuccessResult(modelResult[0])) {
           setError("Failed to fetch model data");
           setIsLoading(false);
           return;
         }
         
-        const modelData = modelResult[0].result;
+        const modelData = modelResult[0].result as [string, string, string, string, number];
+        const [, , ipfsMetadataHash, , saleType] = modelData;
         
         // Fetch additional marketplace data
-        const marketplaceData = await readContracts(wagmiConfig, {
-          contracts: [
-            {
-              address: marketplaceAddress,
-              abi: marketplaceAbi,
-              functionName: 'isModelListed',
-              args: [BigInt(modelId)],
-              chainId: sepolia.id,
-            },
-            {
-              address: marketplaceAddress,
-              abi: marketplaceAbi,
-              functionName: 'getModelPrice',
-              args: [BigInt(modelId)],
-              chainId: sepolia.id,
-            }
-          ],
-        });
+        const marketplaceData = await readContracts(wagmiConfig, { contracts: [
+          {
+            address: marketplaceAddress,
+            abi: marketplaceAbi,
+            functionName: 'isModelListed',
+            args: [BigInt(modelId)],
+            chainId: sepolia.id
+          },
+          {
+            address: marketplaceAddress,
+            abi: marketplaceAbi,
+            functionName: 'getModelPrice',
+            args: [BigInt(modelId)],
+            chainId: sepolia.id
+          }
+        ] });
         
-        const isListed = marketplaceData[0].status === 'success' ? marketplaceData[0].result as boolean : false;
-        const price = marketplaceData[1].status === 'success' ? marketplaceData[1].result as bigint : null;
+        if (!Array.isArray(marketplaceData) || !isSuccessResult(marketplaceData[0]) || !isSuccessResult(marketplaceData[1])) {
+          setError("Failed to fetch marketplace data");
+          setIsLoading(false);
+          return;
+        }
+        
+        const isListed = marketplaceData[0].result as boolean;
+        const price = marketplaceData[1].result as bigint | null;
         
         // Check if user has access
         if (isConnected && address) {
-          const accessResult = await readContracts(wagmiConfig, {
-            contracts: [
-              {
-                address: marketplaceAddress,
-                abi: marketplaceAbi,
-                functionName: 'hasAccess',
-                args: [BigInt(modelId), address],
-                chainId: sepolia.id,
-              },
-              {
-                address: modelRegistryAddress,
-                abi: modelRegistryAbi,
-                functionName: 'ownerOf',
-                args: [BigInt(modelId)],
-                chainId: sepolia.id,
-              },
-            ],
-          });
+          const accessResult = await readContracts(wagmiConfig, { contracts: [
+            {
+              address: marketplaceAddress,
+              abi: marketplaceAbi,
+              functionName: 'hasAccess',
+              args: [BigInt(modelId), address],
+              chainId: sepolia.id
+            },
+            {
+              address: modelRegistryAddress,
+              abi: modelRegistryAbi,
+              functionName: 'ownerOf',
+              args: [BigInt(modelId)],
+              chainId: sepolia.id
+            },
+          ] });
           
-          const hasModelAccess = accessResult[0].status === 'success' ? accessResult[0].result as boolean : false;
-          const isOwner = accessResult[1].status === 'success' ? accessResult[1].result === address : false;
+          if (!Array.isArray(accessResult) || !isSuccessResult(accessResult[0]) || !isSuccessResult(accessResult[1])) {
+            setError("Failed to fetch access data");
+            setIsLoading(false);
+            return;
+          }
+          
+          const hasModelAccess = accessResult[0].result as boolean;
+          const isOwner = accessResult[1].result === address;
           setHasAccess(hasModelAccess || isOwner);
         }
         
         // Combine all data
         const fullModelData: ModelData = {
           id: modelId,
-          owner: modelData[0] as string,
-          ipfsMetadataHash: modelData[1] as string,
-          listTimestamp: modelData[2] as bigint,
-          saleType: Number(modelData[3]),
+          owner: modelData[0],
+          ipfsMetadataHash,
+          listTimestamp: BigInt(0), // Not available in the provided data
+          saleType,
           isListed,
           price
         };
@@ -260,14 +305,22 @@ export default function ModelDetailPage() {
         setIsLoading(false);
         
         // Determine user relationship to model
-        const isOwner = isConnected && address && address.toLowerCase() === modelData[0].toLowerCase();
+        const isOwner = isConnected && address && address.toLowerCase() === fullModelData.owner.toLowerCase();
         const hasModelAccess = hasAccess || (isConnected && isOwner);
         
         // If user is not the owner and doesn't have access and the model is listed, they can purchase
         setCanPurchase(isConnected && !isOwner && !hasModelAccess && isListed);
-      } catch (error: unknown) {
-        console.error("Error fetching model data:", error);
-        setError("Failed to fetch model data");
+      } catch (error) {
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError(String(error));
+        }
+        if (error instanceof Error) {
+          setError(error.message);
+        } else {
+          setError(String(error));
+        }
         setIsLoading(false);
       }
     };
@@ -311,6 +364,43 @@ export default function ModelDetailPage() {
     }
   }, [purchaseReceiptError, purchaseHash]);
 
+  // Check subscription status
+  useEffect(() => {
+    async function checkSub() {
+      setSubscriptionStatus('checking');
+      if (!address || !modelId || model?.saleType !== SaleType.Subscription) {
+        setSubscriptionStatus('none');
+        return;
+      }
+      try {
+        const result = await readContracts(wagmiConfig, { contracts: [
+          {
+            address: marketplaceAddress,
+            abi: marketplaceAbi,
+            functionName: 'checkSubscription',
+            args: [modelId, address],
+            chainId: sepolia.id
+          }
+        ] });
+        if (!Array.isArray(result) || !isSuccessResult(result[0])) {
+          setSubscriptionStatus('none');
+          return;
+        }
+        setSubscriptionStatus((result[0].result as 'active' | 'expired'));
+      } catch (error) {
+        if (error instanceof Error) {
+          setSubscriptionStatus('none');
+          console.error(error.message);
+        } else {
+          setSubscriptionStatus('none');
+          console.error(String(error));
+        }
+        setSubscriptionStatus('none');
+      }
+    }
+    checkSub();
+  }, [address, modelId, model]);
+
   // Purchase model
   const purchaseModel = async () => {
     if (!model || !isConnected || !model.price) return; 
@@ -324,8 +414,39 @@ export default function ModelDetailPage() {
         value: model.price, 
         chainId: sepolia.id,
       });
-    } catch (error: unknown) {
-      console.error("Failed to purchase model:", error);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error(error.message);
+      } else {
+        console.error(String(error));
+      }
+      console.error("Failed to purchase model");
+    }
+  };
+
+  // Subscribe to model
+  const onSubscribe: SubmitHandler<{ months: string }> = async (data) => {
+    const months = Number(data.months);
+    setSubscribeLoading(true);
+    setSubscribeError(null);
+    try {
+      await writePurchaseContract({
+        address: marketplaceAddress,
+        abi: marketplaceAbi,
+        functionName: 'subscribe',
+        args: [modelId, months],
+        chainId: sepolia.id,
+        value: parseEther(months.toString()),
+      });
+      setSubscribeLoading(false);
+      setSubscriptionStatus('active');
+    } catch (e: unknown) {
+      if (e && typeof e === "object" && "message" in e) {
+        setSubscribeError((e as { message: string }).message);
+      } else {
+        setSubscribeError("Unknown error");
+      }
+      setSubscribeLoading(false);
     }
   };
 
@@ -558,6 +679,25 @@ export default function ModelDetailPage() {
                 ) : model.saleType === SaleType.NotForSale ? (
                   <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-md text-center mb-4">
                     <p className="text-gray-700 dark:text-gray-300">This model is not for sale</p>
+                  </div>
+                ) : model.saleType === SaleType.Subscription ? (
+                  <div className="mt-6 p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-md">
+                    <h3 className="text-lg font-semibold mb-2 text-indigo-900 dark:text-indigo-200">Subscription Model</h3>
+                    {subscriptionStatus === 'active' ? (
+                      <div className="text-green-700 dark:text-green-300">You have an active subscription.</div>
+                    ) : (
+                      <form onSubmit={handleSubscribeSubmit(onSubscribe)} className="mt-2 flex flex-col gap-2">
+                        <label htmlFor="months" className="text-sm">Months to subscribe:</label>
+                        <input type="number" id="months" {...registerSubscribe("months")} min="1" className="w-32 px-2 py-1 rounded border" />
+                        {subscribeErrors.months && (
+                          <div className="text-red-500 text-xs">{subscribeErrors.months.message}</div>
+                        )}
+                        <button type="submit" disabled={subscribeLoading} className="mt-2 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                          {subscribeLoading ? "Subscribing..." : "Subscribe"}
+                        </button>
+                        {subscribeError && <div className="text-red-500 text-xs">{subscribeError}</div>}
+                      </form>
+                    )}
                   </div>
                 ) : canPurchase ? (
                   <div>

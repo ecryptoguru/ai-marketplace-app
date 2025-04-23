@@ -25,7 +25,27 @@ contract FusionAI_Marketplace is ReentrancyGuard, Ownable {
 
     mapping(uint256 => CopySale) public copySales; // modelId => Sale details
 
+    // --- Subscription Struct & Mappings ---
+    struct Subscription {
+        uint256 rate;
+        uint32 durationSeconds;
+    }
+    mapping(uint256 => Subscription) public subscriptions;
+    mapping(uint256 => mapping(address => uint256)) public userSubscriptions;
+
     // --- Events ---
+    event ItemListedForSubscription(
+        uint256 indexed modelId,
+        address indexed owner,
+        uint256 rate,
+        uint32 durationSeconds
+    );
+    event Subscribed(
+        uint256 indexed modelId,
+        address indexed subscriber,
+        uint256 expiryTimestamp
+    );
+
     event ItemListedForCopies(
         uint256 indexed modelId,
         address indexed owner,
@@ -185,6 +205,58 @@ contract FusionAI_Marketplace is ReentrancyGuard, Ownable {
              revert Marketplace_NotListedForCopies();
         }
         return (sale.price, sale.totalCopies, sale.soldCopies);
+    }
+
+    // --- Subscription Listing ---
+    function listItemForSubscription(uint256 _modelId, uint256 _rate, uint32 _durationSeconds) external {
+        // Check ownership
+        FusionAI_ModelRegistry.Model memory model = registry.getModel(_modelId);
+        if (model.owner != msg.sender) revert Marketplace_NotModelOwner();
+
+        // Set sale type to Subscription in registry
+        registry.setSaleType(_modelId, FusionAI_ModelRegistry.SaleType.Subscription);
+
+        // Store subscription details
+        subscriptions[_modelId] = Subscription({
+            rate: _rate,
+            durationSeconds: _durationSeconds
+        });
+
+        emit ItemListedForSubscription(_modelId, msg.sender, _rate, _durationSeconds);
+    }
+
+    // --- Subscribe ---
+    function subscribe(uint256 _modelId) external payable nonReentrant {
+        Subscription memory sub = subscriptions[_modelId];
+        if (sub.rate == 0 || sub.durationSeconds == 0) revert Marketplace_NotListedForCopies(); // Reuse error for not listed
+        if (msg.value < sub.rate) revert Marketplace_IncorrectPayment();
+
+        // Calculate new expiry
+        uint256 currentExpiry = userSubscriptions[_modelId][msg.sender];
+        uint256 nowTime = block.timestamp;
+        uint256 newExpiry;
+        if (currentExpiry > nowTime) {
+            // Extend
+            newExpiry = currentExpiry + sub.durationSeconds;
+        } else {
+            newExpiry = nowTime + sub.durationSeconds;
+        }
+        userSubscriptions[_modelId][msg.sender] = newExpiry;
+
+        // Handle ETH transfer (platform fee and payout)
+        FusionAI_ModelRegistry.Model memory model = registry.getModel(_modelId);
+        uint256 platformFee = (msg.value * platformFeePercent) / 100;
+        uint256 payout = msg.value - platformFee;
+
+        _safeTransfer(payable(platformFeeWallet), platformFee);
+        _safeTransfer(payable(model.owner), payout);
+
+        emit Subscribed(_modelId, msg.sender, newExpiry);
+    }
+
+    // --- Check Subscription ---
+    function checkSubscription(uint256 _modelId, address _user) public view returns (bool) {
+        return userSubscriptions[_modelId][_user] >= block.timestamp;
     }
 
     // --- Admin Functions (Platform Fee Management) ---

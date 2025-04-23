@@ -1,0 +1,594 @@
+{
+  "manifestVersion": "3.2",
+  "proxies": [
+    {
+      "address": "0x9ed3C47c012a6532524067F482f7B9DF75C10fAd",
+      "txHash": "0xc014bedbdc990b14675723869a70b4e06b05ea61e749399e6f872ba33aa2a115",
+      "kind": "uups"
+    },
+    {
+      "address": "0x43Bc927e335CC026A953402d9a65EE675D847F81",
+      "txHash": "0x92892027a459ac5106a927a31b72987bbea1bf9c8800c3beaaef27f4ebfbdd06",
+      "kind": "uups"
+    },
+    {
+      "address": "0xDDbe305CD5e9e1f5D7ee7483AB303B611773b043",
+      "txHash": "0x0e20408336554715bbf8d391030fd464ede19da17bc2b2ed30530ad1aca8259e",
+      "kind": "uups"
+    },
+    {
+      "address": "0x79A8B2cC7fa3F8cb3AdA89d80635c8029e9FE8CE",
+      "txHash": "0x08d36d366a308a3501a7d4491b9c39fc65da1e6c7791a46722cb4533231dccde",
+      "kind": "uups"
+    }
+  ],
+  "impls": {
+    "5025c73b22503f8c5a4160fd47808037b5c67e3223e6a888ada8a5848a9072cf": {
+      "address": "0x46BF7e02Cdd961706f54017707dA8bAf733D4Ed2",
+      "txHash": "0x8fe97a4536f35e3ad31e0287cc4adf8cb1ac27c1d3c1a85cba41dde7e2db7472",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "models",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_uint256,t_struct(Model)3496_storage)",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:26"
+          },
+          {
+            "label": "ipfsHashExists",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_string_memory_ptr,t_bool)",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:27"
+          },
+          {
+            "label": "_modelCounter",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_uint256",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:28"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_enum(SaleType)3486": {
+            "label": "enum FusionAI_ModelRegistryUpgradeable.SaleType",
+            "members": [
+              "NotForSale",
+              "Copies",
+              "Subscription"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_string_memory_ptr,t_bool)": {
+            "label": "mapping(string => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Model)3496_storage)": {
+            "label": "mapping(uint256 => struct FusionAI_ModelRegistryUpgradeable.Model)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Model)3496_storage": {
+            "label": "struct FusionAI_ModelRegistryUpgradeable.Model",
+            "members": [
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "ipfsMetadataHash",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "listTimestamp",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "saleType",
+                "type": "t_enum(SaleType)3486",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "c89c9e2c5e231216339242b4ce6e707e060e2b60913951c138b045308234c666": {
+      "address": "0x440a6c7B13308521Ce4691B16254df745af95929",
+      "txHash": "0x435746dd050df3ede875dbff54c5e91620fa77ccd41b882978c3f20175c89b3b",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "registry",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_contract(FusionAI_ModelRegistryUpgradeable)3735",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:15"
+          },
+          {
+            "label": "platformFeeWallet",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_address",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:16"
+          },
+          {
+            "label": "platformFeePercent",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_uint256",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:17"
+          },
+          {
+            "label": "copySales",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_uint256,t_struct(CopySale)2556_storage)",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:24"
+          },
+          {
+            "label": "subscriptions",
+            "offset": 0,
+            "slot": "4",
+            "type": "t_mapping(t_uint256,t_struct(Subscription)2566_storage)",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:30"
+          },
+          {
+            "label": "userSubscriptions",
+            "offset": 0,
+            "slot": "5",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_uint256))",
+            "contract": "FusionAI_MarketplaceUpgradeable",
+            "src": "contracts/FusionAI_MarketplaceUpgradeable.sol:31"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(ReentrancyGuardStorage)226_storage": {
+            "label": "struct ReentrancyGuardUpgradeable.ReentrancyGuardStorage",
+            "members": [
+              {
+                "label": "_status",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_contract(FusionAI_ModelRegistryUpgradeable)3735": {
+            "label": "contract FusionAI_ModelRegistryUpgradeable",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(uint256 => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(CopySale)2556_storage)": {
+            "label": "mapping(uint256 => struct FusionAI_MarketplaceUpgradeable.CopySale)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Subscription)2566_storage)": {
+            "label": "mapping(uint256 => struct FusionAI_MarketplaceUpgradeable.Subscription)",
+            "numberOfBytes": "32"
+          },
+          "t_struct(CopySale)2556_storage": {
+            "label": "struct FusionAI_MarketplaceUpgradeable.CopySale",
+            "members": [
+              {
+                "label": "price",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "totalCopies",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "soldCopies",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              }
+            ],
+            "numberOfBytes": "96"
+          },
+          "t_struct(Subscription)2566_storage": {
+            "label": "struct FusionAI_MarketplaceUpgradeable.Subscription",
+            "members": [
+              {
+                "label": "rate",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "durationSeconds",
+                "type": "t_uint32",
+                "offset": 0,
+                "slot": "1"
+              }
+            ],
+            "numberOfBytes": "64"
+          },
+          "t_uint32": {
+            "label": "uint32",
+            "numberOfBytes": "4"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.ReentrancyGuard": [
+            {
+              "contract": "ReentrancyGuardUpgradeable",
+              "label": "_status",
+              "type": "t_uint256",
+              "src": "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol:43",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    },
+    "4773ea3b9adb0f3e8f8947a979d67375fa7c81e70f7225a54b61b805eb117781": {
+      "address": "0x898d08dA7fC74bab98649Ac6867f4a6f3059e573",
+      "txHash": "0xf21fc79682d8910cae0d7db4226f815c15c5bf71e4013fc9071d212d0c8daadc",
+      "layout": {
+        "solcVersion": "0.8.22",
+        "storage": [
+          {
+            "label": "models",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_mapping(t_uint256,t_struct(Model)2252_storage)",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:26"
+          },
+          {
+            "label": "ipfsHashExists",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_mapping(t_string_memory_ptr,t_bool)",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:27"
+          },
+          {
+            "label": "_modelCounter",
+            "offset": 0,
+            "slot": "2",
+            "type": "t_uint256",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:28"
+          },
+          {
+            "label": "operators",
+            "offset": 0,
+            "slot": "3",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "FusionAI_ModelRegistryUpgradeable",
+            "src": "contracts/FusionAI_ModelRegistryUpgradeable.sol:31"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_struct(InitializableStorage)73_storage": {
+            "label": "struct Initializable.InitializableStorage",
+            "members": [
+              {
+                "label": "_initialized",
+                "type": "t_uint64",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "_initializing",
+                "type": "t_bool",
+                "offset": 8,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_struct(OwnableStorage)13_storage": {
+            "label": "struct OwnableUpgradeable.OwnableStorage",
+            "members": [
+              {
+                "label": "_owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              }
+            ],
+            "numberOfBytes": "32"
+          },
+          "t_uint64": {
+            "label": "uint64",
+            "numberOfBytes": "8"
+          },
+          "t_enum(SaleType)2242": {
+            "label": "enum FusionAI_ModelRegistryUpgradeable.SaleType",
+            "members": [
+              "NotForSale",
+              "Copies",
+              "Subscription"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_string_memory_ptr,t_bool)": {
+            "label": "mapping(string => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_struct(Model)2252_storage)": {
+            "label": "mapping(uint256 => struct FusionAI_ModelRegistryUpgradeable.Model)",
+            "numberOfBytes": "32"
+          },
+          "t_string_memory_ptr": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Model)2252_storage": {
+            "label": "struct FusionAI_ModelRegistryUpgradeable.Model",
+            "members": [
+              {
+                "label": "owner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "ipfsMetadataHash",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "listTimestamp",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "saleType",
+                "type": "t_enum(SaleType)2242",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          }
+        },
+        "namespaces": {
+          "erc7201:openzeppelin.storage.Ownable": [
+            {
+              "contract": "OwnableUpgradeable",
+              "label": "_owner",
+              "type": "t_address",
+              "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:24",
+              "offset": 0,
+              "slot": "0"
+            }
+          ],
+          "erc7201:openzeppelin.storage.Initializable": [
+            {
+              "contract": "Initializable",
+              "label": "_initialized",
+              "type": "t_uint64",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:69",
+              "offset": 0,
+              "slot": "0"
+            },
+            {
+              "contract": "Initializable",
+              "label": "_initializing",
+              "type": "t_bool",
+              "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:73",
+              "offset": 8,
+              "slot": "0"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

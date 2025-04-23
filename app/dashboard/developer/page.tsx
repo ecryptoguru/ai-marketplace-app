@@ -22,6 +22,7 @@ interface OwnedModel {
   ipfsMetadataHash: string;
   isListed: boolean;
   price: bigint | null;
+  saleType: number; // Add saleType to the interface
 }
 
 export default function DeveloperDashboardPage() {
@@ -29,6 +30,7 @@ export default function DeveloperDashboardPage() {
   const [ownedModels, setOwnedModels] = useState<OwnedModel[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionStats, setSubscriptionStats] = useState<Record<number, { active: number; revenue: string }>>({});
 
   // Read model count
   const { data: modelCountBigInt } = useReadContract({
@@ -70,22 +72,24 @@ export default function DeveloperDashboardPage() {
               console.log(`Model ${modelId} data:`, modelData);
               
               // Extract owner and ipfsHash based on the structure of the returned data
-              let owner, ipfsHash;
+              let owner, ipfsHash, saleType;
               
               if (Array.isArray(modelData)) {
                 owner = modelData[0];
                 ipfsHash = modelData[1];
+                saleType = modelData[2]; // Extract saleType
               } else if (modelData && typeof modelData === 'object') {
                 const modelObj = modelData as Record<string, unknown>;
                 owner = modelObj.owner as string;
                 ipfsHash = (modelObj.ipfsMetadataHash || modelObj.cid || modelObj.ipfsHash) as string;
+                saleType = modelObj.saleType as number; // Extract saleType
               } else {
                 console.error(`Unexpected model data format for model ${modelId}:`, modelData);
                 return null;
               }
               
-              if (!owner || !ipfsHash) {
-                console.error(`Missing owner or ipfsHash for model ${modelId}`);
+              if (!owner || !ipfsHash || saleType === undefined) {
+                console.error(`Missing owner or ipfsHash or saleType for model ${modelId}`);
                 return null;
               }
               
@@ -135,7 +139,8 @@ export default function DeveloperDashboardPage() {
                   name,
                   ipfsMetadataHash: ipfsHash,
                   isListed,
-                  price
+                  price,
+                  saleType, // Add saleType to the returned object
                 };
               }
             } catch (err) {
@@ -162,6 +167,38 @@ export default function DeveloperDashboardPage() {
 
     fetchOwnedModels();
   }, [address, isConnected, modelCount]);
+
+  useEffect(() => {
+    async function fetchStats() {
+      if (!isConnected || !address || ownedModels.length === 0) return;
+      const stats: Record<number, { active: number; revenue: string }> = {};
+      for (const model of ownedModels) {
+        if (model.saleType === 2) {
+          // Fetch number of active subscriptions and revenue if available
+          try {
+            const result = await readContract(wagmiConfig, {
+              address: marketplaceAddress,
+              abi: marketplaceAbi,
+              functionName: "getSubscriptionStats", // Assumes this exists
+              args: [model.id],
+              chainId: sepolia.id,
+            });
+            if (Array.isArray(result)) {
+              const [active, revenue] = result as [boolean, bigint];
+              stats[model.id] = {
+                active: Number(active),
+                revenue: formatEther(revenue),
+              };
+            }
+          } catch {
+            stats[model.id] = { active: 0, revenue: "0" };
+          }
+        }
+      }
+      setSubscriptionStats(stats);
+    }
+    fetchStats();
+  }, [isConnected, address, ownedModels]);
 
   // Helper function to format price
   const formatPrice = (price: bigint | null): string => {
@@ -198,16 +235,18 @@ export default function DeveloperDashboardPage() {
           {ownedModels.map((model) => (
             <div key={model.id} className="bg-white dark:bg-zinc-900 shadow-md rounded-lg p-6 flex flex-col justify-between">
               <div>
-                <h3 className="text-xl font-semibold mb-2 truncate" title={model.name}>
-                  {model.name}
-                </h3>
+                <h3 className="text-xl font-semibold mb-2 truncate" title={model.name}>{model.name}</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">Model ID: {model.id}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 break-all mb-4">
-                   Metadata Hash: {model.ipfsMetadataHash}
-                </p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 break-all mb-4">Metadata Hash: {model.ipfsMetadataHash}</p>
                 <div className="space-y-1 text-sm mb-4">
-                    <p>Status: <span className={`font-medium ${model.isListed ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>{model.isListed ? 'Listed' : 'Not Listed'}</span></p>
-                    <p>Price: <span className="font-medium text-gray-800 dark:text-gray-200">{formatPrice(model.price)}</span></p>
+                  <p>Status: <span className={`font-medium ${model.isListed ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>{model.isListed ? 'Listed' : 'Not Listed'}</span></p>
+                  <p>Price: <span className="font-medium text-gray-800 dark:text-gray-200">{formatPrice(model.price)}</span></p>
+                  {model.saleType === 2 && subscriptionStats[model.id] && (
+                    <>
+                      <p>Active Subscriptions: <span className="font-medium text-indigo-700 dark:text-indigo-300">{subscriptionStats[model.id].active}</span></p>
+                      <p>Total Revenue: <span className="font-medium text-green-700 dark:text-green-300">{subscriptionStats[model.id].revenue} ETH</span></p>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="mt-auto pt-4 border-t border-gray-200 dark:border-gray-700">

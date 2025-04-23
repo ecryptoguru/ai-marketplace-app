@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-verify";
+import "@openzeppelin/hardhat-upgrades";
 import * as dotenv from "dotenv";
 
 // Load environment variables from .env file
@@ -25,7 +26,7 @@ if (!etherscanApiKey) {
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.20", // Match the pragma in your contracts
+    version: "0.8.22", // Match the pragma in your contracts
     settings: {
       optimizer: {
         enabled: true,
